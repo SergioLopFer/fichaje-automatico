@@ -1,95 +1,70 @@
-# Fichaje automático — Tests Playwright
+# Fichaje Automático
 
-Este repositorio contiene pruebas E2E con Playwright y un workflow de GitHub Actions que ejecuta los tests por caso de uso y envía una notificación por email al terminar.
+Automatización del proceso de fichaje usando Playwright y GitHub Actions.
 
-## Estructura principal
+## 🕒 Horarios Configurados
 
-- `tests/` — Contiene los archivos de prueba (*.spec.ts):
-  - `login-people.spec.ts` — Tests de login
-  - `fichar-entrada-presencial.spec.ts` — Tests de fichaje entrada presencial
-  - `fichar-entrada-teletrabajo.spec.ts` — Tests de fichaje entrada teletrabajo
-  - `fichar-salida.spec.ts` — Tests de fichaje de salida
-  - `example.spec.ts` — Archivo de ejemplo (no necesario; recomendado eliminar)
+### Invierno (CET, UTC+1) - Noviembre a Marzo
+- **Entrada**: 08:00 CET
+  - Presencial: Martes y Jueves
+  - Teletrabajo: Lunes, Miércoles y Viernes
+- **Salida**:
+  - Lunes a Jueves: 17:30 CET
+  - Viernes: 14:00 CET
 
-- `playwright.config.ts` — Configuración de Playwright
-- `.github/workflows/playwright.yml` — Workflow de CI que ejecuta los tests y envía emails
-- `playwright-report/` y `test-results/` — Directorios generados por Playwright y runners (no versionar)
-- `package.json`, `package-lock.json` — Dependencias y scripts
+### Verano (CEST, UTC+2) - Abril a Octubre
+- **Entrada**: 08:00 CEST
+  - Presencial: Martes y Jueves
+  - Teletrabajo: Lunes, Miércoles y Viernes
+- **Salida**:
+  - Lunes a Jueves: 17:30 CEST
+  - Viernes: 14:00 CEST
 
-## Qué hace el workflow (`.github/workflows/playwright.yml`)
+## 📅 Festivos
+Los días festivos se configuran en `.github/holidays/malaga.txt`. El workflow no ejecutará los tests en estos días.
 
-- Ejecuta los tests por caso de uso:
-  - `test-fichar-entrada` — ejecuta `tests/fichar-entrada-presencial.spec.ts` y `tests/fichar-entrada-teletrabajo.spec.ts`
-  - `test-fichar-salida` — ejecuta `tests/fichar-salida.spec.ts`
-- Guarda los reportes generados bajo `playwright-report/` como artefactos del run.
-- Envía un email con el resultado final (éxito/fracaso) usando la acción `dawidd6/action-send-mail`.
+## 🚀 Ejecución Manual
+El workflow puede ejecutarse manualmente desde GitHub Actions seleccionando:
+- Test Suite: `fichar-entrada` o `fichar-salida`
 
-### Triggers del workflow
+## 💻 Desarrollo Local
 
-El workflow se ejecuta en:
+### Pre-requisitos
+- Node.js (versión LTS)
+- npm
 
-- `push` a `main` / `master`
-- `pull_request` hacia `main` / `master`
-- `workflow_dispatch` (manual)
-- `schedule` (cron):
-  - `test-fichar-entrada`: lunes a viernes a las 8:00 CET (7:00 UTC) — cron `0 7 * * 1-5`
-  - `test-fichar-salida`: lunes a jueves a las 17:30 CET (16:30 UTC) — cron `30 16 * * 1-4`
-  - `test-fichar-salida` (viernes): viernes a las 14:00 CET (13:00 UTC) — cron `0 13 * * 5`
-
-> Nota: GitHub Actions usa UTC para los valores `cron`, por eso en el workflow aparecen las horas en UTC.
-
-## Configuración necesaria para el envío de emails
-
-Debes añadir los siguientes secretos en el repositorio (Settings → Secrets and variables → Actions):
-
-- `EMAIL_USERNAME` — Dirección de correo utilizada para autenticar (p. ej. Gmail)
-- `EMAIL_PASSWORD` — Contraseña o contraseña de aplicación (app password). Para Gmail es recomendable generar una contraseña de aplicación
-- `EMAIL_RECIPIENT` — Dirección de destino que recibirá las notificaciones
-
-Una vez añadidos, el workflow usará estos valores para enviar el email.
-
-## Cómo ejecutar los tests localmente
-
-1. Instalar dependencias:
-
+### Instalación
 ```bash
+# Instalar dependencias
 npm ci
-```
 
-2. Instalar navegadores de Playwright (solo una vez):
-
-```bash
+# Instalar navegadores de Playwright
 npx playwright install --with-deps
 ```
 
-3. Ejecutar todos los tests:
-
+### Ejecución de Tests
 ```bash
-npx playwright test
-```
+# Ejecutar todos los tests
+npm test
 
-4. Ejecutar solo los tests de un caso de uso (ejemplo `fichar-entrada`):
-
-```bash
+# Ejecutar test específico
 npx playwright test tests/fichar-entrada-presencial.spec.ts
 npx playwright test tests/fichar-entrada-teletrabajo.spec.ts
+npx playwright test tests/fichar-salida.spec.ts
 ```
 
-5. Ejecutar un test concreto o con filtro por título:
+## 📊 Reportes
+Los resultados de las pruebas se publican en GitHub Pages y se envían por email.
 
-```bash
-npx playwright test -g "nombre del test"
-```
+## ⚙️ Variables de Entorno
+- `BASE_URL`: URL base para las pruebas (requerida)
+- `EMAIL_USERNAME`: Usuario SMTP para notificaciones
+- `EMAIL_PASSWORD`: Contraseña SMTP para notificaciones
+- `EMAIL_RECIPIENT`: Destinatario de las notificaciones
 
-Los reportes se guardarán en `playwright-report/`.
-
-## Archivos/directorios recomendados para limpiar o ignorar
-
-- `tests/example.spec.ts` — Archivo de ejemplo; se recomienda eliminarlo si no aporta valor.
-- `playwright-report/` y `test-results/` — Directorios generados, no versionarlos. Asegúrate de tenerlos en `.gitignore`.
-
-## Consejos y buenas prácticas
-
-- Usa contraseñas de aplicación para Gmail o un servicio SMTP dedicado con credenciales específicas para automatización.
-- Si necesitas enviar adjuntos (por ejemplo los reportes), puedes ampliar la acción de envío de correo o usar una acción alternativa que soporte adjuntos más grandes.
-- Para depurar ejecuciones programadas, activa `workflow_dispatch` y prueba manualmente antes de confiar en el cron.
+## 🤝 Contribuciones
+1. Fork el repositorio
+2. Crea una rama (`git checkout -b feature/AmazingFeature`)
+3. Commit tus cambios (`git commit -m 'Add some AmazingFeature'`)
+4. Push a la rama (`git push origin feature/AmazingFeature`)
+5. Abre un Pull Request

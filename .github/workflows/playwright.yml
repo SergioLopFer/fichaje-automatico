@@ -11,17 +11,24 @@ on:
         required: false
         type: choice
         options:
-          - all
           - fichar-entrada
           - fichar-salida
-        default: 'all'
+        default: ''
   schedule:
-    # Fichar Entrada - Lunes a Viernes a las 8:00 CET (7:00 UTC)
-    - cron: '0 7 * * 1-5'
-    # Fichar Salida - Lunes a Jueves a las 17:30 CET (16:30 UTC)
-    - cron: '30 16 * * 1-4'
-    # Fichar Salida - Viernes a las 14:00 CET (13:00 UTC)
-    - cron: '0 13 * * 5'
+    # Invierno (CET, UTC+1) — meses aproximados: nov, dic, ene, feb, mar
+    # Fichar Entrada - 08:00 CET -> 07:00 UTC
+    - cron: '0 7 * 11,12,1,2,3 1-5'
+    # Fichar Salida - 17:30 CET -> 16:30 UTC (Lunes-Jueves)
+    - cron: '30 16 * 11,12,1,2,3 1-4'
+    # Fichar Salida - 14:00 CET -> 13:00 UTC (Viernes)
+    - cron: '0 13 * 11,12,1,2,3 5'
+    # Verano (CEST, UTC+2) — meses aproximados: abr-oct
+    # Fichar Entrada - 08:00 CEST -> 06:00 UTC
+    - cron: '0 6 * 4,5,6,7,8,9,10 1-5'
+    # Fichar Salida - 17:30 CEST -> 15:30 UTC (Lunes-Jueves)
+    - cron: '30 15 * 4,5,6,7,8,9,10 1-4'
+    # Fichar Salida - 14:00 CEST -> 12:00 UTC (Viernes)
+    - cron: '0 12 * 4,5,6,7,8,9,10 5'
 
 env:
   PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD: 1 # Se instalará en el paso de cache
@@ -33,41 +40,56 @@ jobs:
     timeout-minutes: 60
     runs-on: ubuntu-latest
     if: |
-      (github.event_name == 'schedule' && github.event.schedule == '0 7 * * 1-5') ||
-      (github.event_name == 'workflow_dispatch' && (github.event.inputs.test_suite == 'all' || github.event.inputs.test_suite == 'fichar-entrada')) ||
-      github.event_name == 'push' ||
-      github.event_name == 'pull_request'
+      (github.event_name == 'schedule' && (github.event.schedule == '0 7 * 11,12,1,2,3 1-5' || github.event.schedule == '0 6 * 4,5,6,7,8,9,10 1-5')) ||
+      (github.event_name == 'workflow_dispatch' && github.event.inputs.test_suite == 'fichar-entrada')
     steps:
     - uses: actions/checkout@v4
-    
+
+    - name: Check Málaga holidays
+      id: holiday-check
+      run: |
+        TODAY=$(TZ=Europe/Madrid date +%F)
+        if [ -f .github/holidays/malaga.txt ]; then
+          if grep -Fxq "$TODAY" .github/holidays/malaga.txt; then
+            echo "is_holiday=true" >> $GITHUB_OUTPUT
+          else
+            echo "is_holiday=false" >> $GITHUB_OUTPUT
+          fi
+        else
+          echo "is_holiday=false" >> $GITHUB_OUTPUT
+        fi
+
     - name: Setup Node.js
       uses: actions/setup-node@v4
       with:
         node-version: lts/*
         cache: 'npm'
-    
+
     - name: Cache Playwright browsers
+      id: playwright-cache
       uses: actions/cache@v3
       with:
         path: ~/.cache/ms-playwright
         key: playwright-browsers-${{ runner.os }}
-    
+
     - name: Install dependencies
+      if: steps.holiday-check.outputs.is_holiday != 'true'
       run: npm ci
-    
+
     - name: Install Playwright browsers if not cached
+      if: steps.holiday-check.outputs.is_holiday != 'true' && steps.playwright-cache.outputs.cache-hit != 'true'
       run: npx playwright install --with-deps
-      if: steps.playwright-cache.outputs.cache-hit != 'true'
-    
+
     - name: Run Fichar Entrada tests
+      if: steps.holiday-check.outputs.is_holiday != 'true'
       id: run-tests
       run: |
         echo "::group::Running Fichar Entrada tests"
         npx playwright test tests/fichar-entrada-presencial.spec.ts tests/fichar-entrada-teletrabajo.spec.ts
         echo "::endgroup::"
-      
+
     - name: Upload test results
-      if: always()
+      if: steps.holiday-check.outputs.is_holiday != 'true'
       uses: actions/upload-artifact@v4
       with:
         name: fichar-entrada-report-${{ github.run_id }}
@@ -80,41 +102,56 @@ jobs:
     name: Test Fichar Salida Use Case
     runs-on: ubuntu-latest
     if: |
-      (github.event_name == 'schedule' && (github.event.schedule == '30 16 * * 1-4' || github.event.schedule == '0 13 * * 5')) ||
-      (github.event_name == 'workflow_dispatch' && (github.event.inputs.test_suite == 'all' || github.event.inputs.test_suite == 'fichar-salida')) ||
-      github.event_name == 'push' ||
-      github.event_name == 'pull_request'
+      (github.event_name == 'schedule' && (github.event.schedule == '30 16 * 11,12,1,2,3 1-4' || github.event.schedule == '0 13 * 11,12,1,2,3 5' || github.event.schedule == '30 15 * 4,5,6,7,8,9,10 1-4' || github.event.schedule == '0 12 * 4,5,6,7,8,9,10 5')) ||
+      (github.event_name == 'workflow_dispatch' && github.event.inputs.test_suite == 'fichar-salida')
     steps:
     - uses: actions/checkout@v4
-    
+
+    - name: Check Málaga holidays
+      id: holiday-check
+      run: |
+        TODAY=$(TZ=Europe/Madrid date +%F)
+        if [ -f .github/holidays/malaga.txt ]; then
+          if grep -Fxq "$TODAY" .github/holidays/malaga.txt; then
+            echo "is_holiday=true" >> $GITHUB_OUTPUT
+          else
+            echo "is_holiday=false" >> $GITHUB_OUTPUT
+          fi
+        else
+          echo "is_holiday=false" >> $GITHUB_OUTPUT
+        fi
+
     - name: Setup Node.js
       uses: actions/setup-node@v4
       with:
         node-version: lts/*
         cache: 'npm'
-    
+
     - name: Cache Playwright browsers
+      id: playwright-cache
       uses: actions/cache@v3
       with:
         path: ~/.cache/ms-playwright
         key: playwright-browsers-${{ runner.os }}
-    
+
     - name: Install dependencies
+      if: steps.holiday-check.outputs.is_holiday != 'true'
       run: npm ci
-    
+
     - name: Install Playwright browsers if not cached
+      if: steps.holiday-check.outputs.is_holiday != 'true' && steps.playwright-cache.outputs.cache-hit != 'true'
       run: npx playwright install --with-deps
-      if: steps.playwright-cache.outputs.cache-hit != 'true'
-    
+
     - name: Run Fichar Salida tests
+      if: steps.holiday-check.outputs.is_holiday != 'true'
       id: run-tests
       run: |
         echo "::group::Running Fichar Salida tests"
         npx playwright test tests/fichar-salida.spec.ts
         echo "::endgroup::"
-      
+
     - name: Upload test results
-      if: always()
+      if: steps.holiday-check.outputs.is_holiday != 'true'
       uses: actions/upload-artifact@v4
       with:
         name: fichar-salida-report-${{ github.run_id }}
@@ -133,20 +170,20 @@ jobs:
         uses: actions/download-artifact@v4
         with:
           path: all-artifacts
-          
+
       - name: Setup Pages
         uses: actions/configure-pages@v4
-        
+
       - name: Upload Pages artifact
         uses: actions/upload-pages-artifact@v3
         with:
           path: all-artifacts
-          
+
       - name: Deploy to GitHub Pages
         uses: actions/deploy-pages@v4
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
-          
+
   notify:
     name: Send Email Notification
     needs: [test-fichar-entrada, test-fichar-salida, publish-report]
@@ -156,7 +193,7 @@ jobs:
       - name: Get current time
         id: time
         run: echo "time=$(date +'%Y-%m-%d %H:%M:%S %Z')" >> $GITHUB_OUTPUT
-      
+
       - name: Send email
         uses: dawidd6/action-send-mail@v3
         with:
@@ -170,19 +207,19 @@ jobs:
           html_body: |
             <h2>Resultados de las pruebas de Playwright</h2>
             <p>Ejecutado el: ${{ steps.time.outputs.time }}</p>
-            
+
             <h3>Resumen</h3>
             <ul>
               <li>Fichar Entrada: <strong>${{ needs.test-fichar-entrada.result }}</strong></li>
               <li>Fichar Salida: <strong>${{ needs.test-fichar-salida.result }}</strong></li>
             </ul>
-            
+
             <h3>Enlaces</h3>
             <ul>
               <li><a href="${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}">Ver ejecución en GitHub Actions</a></li>
               <li><a href="https://${{ github.repository_owner }}.github.io/${{ github.event.repository.name }}">Ver reporte HTML detallado</a></li>
             </ul>
-            
+
             <p style="color: #666; font-size: 0.9em;">
               Trigger: ${{ github.event_name }}<br>
               Branch: ${{ github.ref_name }}<br>

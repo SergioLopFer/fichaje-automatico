@@ -1,0 +1,190 @@
+name: Playwright Tests by Use Case
+on:
+  push:
+    branches: [ main, master ]
+  pull_request:
+    branches: [ main, master ]
+  workflow_dispatch:
+    inputs:
+      test_suite:
+        description: 'Test suite to run'
+        required: false
+        type: choice
+        options:
+          - all
+          - fichar-entrada
+          - fichar-salida
+        default: 'all'
+  schedule:
+    # Fichar Entrada - Lunes a Viernes a las 8:00 CET (7:00 UTC)
+    - cron: '0 7 * * 1-5'
+    # Fichar Salida - Lunes a Jueves a las 17:30 CET (16:30 UTC)
+    - cron: '30 16 * * 1-4'
+    # Fichar Salida - Viernes a las 14:00 CET (13:00 UTC)
+    - cron: '0 13 * * 5'
+
+env:
+  PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD: 1 # Se instalará en el paso de cache
+  BASE_URL: ${{ secrets.BASE_URL }}
+
+jobs:
+  test-fichar-entrada:
+    name: Test Fichar Entrada Use Cases
+    timeout-minutes: 60
+    runs-on: ubuntu-latest
+    if: |
+      (github.event_name == 'schedule' && github.event.schedule == '0 7 * * 1-5') ||
+      (github.event_name == 'workflow_dispatch' && (github.event.inputs.test_suite == 'all' || github.event.inputs.test_suite == 'fichar-entrada')) ||
+      github.event_name == 'push' ||
+      github.event_name == 'pull_request'
+    steps:
+    - uses: actions/checkout@v4
+    
+    - name: Setup Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: lts/*
+        cache: 'npm'
+    
+    - name: Cache Playwright browsers
+      uses: actions/cache@v3
+      with:
+        path: ~/.cache/ms-playwright
+        key: playwright-browsers-${{ runner.os }}
+    
+    - name: Install dependencies
+      run: npm ci
+    
+    - name: Install Playwright browsers if not cached
+      run: npx playwright install --with-deps
+      if: steps.playwright-cache.outputs.cache-hit != 'true'
+    
+    - name: Run Fichar Entrada tests
+      id: run-tests
+      run: |
+        echo "::group::Running Fichar Entrada tests"
+        npx playwright test tests/fichar-entrada-presencial.spec.ts tests/fichar-entrada-teletrabajo.spec.ts
+        echo "::endgroup::"
+      
+    - name: Upload test results
+      if: always()
+      uses: actions/upload-artifact@v4
+      with:
+        name: fichar-entrada-report-${{ github.run_id }}
+        path: |
+          playwright-report/
+          test-results/
+        retention-days: 30
+
+  test-fichar-salida:
+    name: Test Fichar Salida Use Case
+    runs-on: ubuntu-latest
+    if: |
+      (github.event_name == 'schedule' && (github.event.schedule == '30 16 * * 1-4' || github.event.schedule == '0 13 * * 5')) ||
+      (github.event_name == 'workflow_dispatch' && (github.event.inputs.test_suite == 'all' || github.event.inputs.test_suite == 'fichar-salida')) ||
+      github.event_name == 'push' ||
+      github.event_name == 'pull_request'
+    steps:
+    - uses: actions/checkout@v4
+    
+    - name: Setup Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: lts/*
+        cache: 'npm'
+    
+    - name: Cache Playwright browsers
+      uses: actions/cache@v3
+      with:
+        path: ~/.cache/ms-playwright
+        key: playwright-browsers-${{ runner.os }}
+    
+    - name: Install dependencies
+      run: npm ci
+    
+    - name: Install Playwright browsers if not cached
+      run: npx playwright install --with-deps
+      if: steps.playwright-cache.outputs.cache-hit != 'true'
+    
+    - name: Run Fichar Salida tests
+      id: run-tests
+      run: |
+        echo "::group::Running Fichar Salida tests"
+        npx playwright test tests/fichar-salida.spec.ts
+        echo "::endgroup::"
+      
+    - name: Upload test results
+      if: always()
+      uses: actions/upload-artifact@v4
+      with:
+        name: fichar-salida-report-${{ github.run_id }}
+        path: |
+          playwright-report/
+          test-results/
+        retention-days: 30
+
+  publish-report:
+    name: Publish HTML Report
+    needs: [test-fichar-entrada, test-fichar-salida]
+    if: always()
+    runs-on: ubuntu-latest
+    steps:
+      - name: Download all artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: all-artifacts
+          
+      - name: Setup Pages
+        uses: actions/configure-pages@v4
+        
+      - name: Upload Pages artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: all-artifacts
+          
+      - name: Deploy to GitHub Pages
+        uses: actions/deploy-pages@v4
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          
+  notify:
+    name: Send Email Notification
+    needs: [test-fichar-entrada, test-fichar-salida, publish-report]
+    if: always()
+    runs-on: ubuntu-latest
+    steps:
+      - name: Get current time
+        id: time
+        run: echo "time=$(date +'%Y-%m-%d %H:%M:%S %Z')" >> $GITHUB_OUTPUT
+      
+      - name: Send email
+        uses: dawidd6/action-send-mail@v3
+        with:
+          server_address: smtp.gmail.com
+          server_port: 465
+          username: ${{ secrets.EMAIL_USERNAME }}
+          password: ${{ secrets.EMAIL_PASSWORD }}
+          subject: "Playwright Tests Results - ${{ steps.time.outputs.time }}"
+          to: ${{ secrets.EMAIL_RECIPIENT }}
+          from: GitHub Actions
+          html_body: |
+            <h2>Resultados de las pruebas de Playwright</h2>
+            <p>Ejecutado el: ${{ steps.time.outputs.time }}</p>
+            
+            <h3>Resumen</h3>
+            <ul>
+              <li>Fichar Entrada: <strong>${{ needs.test-fichar-entrada.result }}</strong></li>
+              <li>Fichar Salida: <strong>${{ needs.test-fichar-salida.result }}</strong></li>
+            </ul>
+            
+            <h3>Enlaces</h3>
+            <ul>
+              <li><a href="${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}">Ver ejecución en GitHub Actions</a></li>
+              <li><a href="https://${{ github.repository_owner }}.github.io/${{ github.event.repository.name }}">Ver reporte HTML detallado</a></li>
+            </ul>
+            
+            <p style="color: #666; font-size: 0.9em;">
+              Trigger: ${{ github.event_name }}<br>
+              Branch: ${{ github.ref_name }}<br>
+              Commit: ${{ github.sha }}
+            </p>

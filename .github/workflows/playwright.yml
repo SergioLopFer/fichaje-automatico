@@ -85,7 +85,21 @@ jobs:
       id: run-tests
       run: |
         echo "::group::Running Fichar Entrada tests"
-        npx playwright test tests/fichar-entrada-presencial.spec.ts tests/fichar-entrada-teletrabajo.spec.ts
+        DAY=$(TZ=Europe/Madrid date +%u)  # 1=Mon ... 7=Sun
+        echo "Día (Europe/Madrid): $DAY"
+        case "$DAY" in
+          2|4)
+            echo "Ejecutando: fichar-entrada-presencial (martes/jueves)"
+            npx playwright test tests/fichar-entrada-presencial.spec.ts --reporter=list
+            ;;
+          1|3|5)
+            echo "Ejecutando: fichar-entrada-teletrabajo (lun/mié/vie)"
+            npx playwright test tests/fichar-entrada-teletrabajo.spec.ts --reporter=list
+            ;;
+          *)
+            echo "Día no laborable o fin de semana ($DAY) — omitiendo pruebas de entrada."
+            ;;
+        esac
         echo "::endgroup::"
 
     - name: Upload test results
@@ -147,7 +161,7 @@ jobs:
       id: run-tests
       run: |
         echo "::group::Running Fichar Salida tests"
-        npx playwright test tests/fichar-salida.spec.ts
+        npx playwright test tests/fichar-salida.spec.ts --reporter=list
         echo "::endgroup::"
 
     - name: Upload test results

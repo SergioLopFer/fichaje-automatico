@@ -8,6 +8,13 @@ test('test', async ({ page }) => {
   await page.getByRole('textbox', { name: 'Contraseña' }).click();
   await page.getByRole('textbox', { name: 'Contraseña' }).fill('CuentaMentor2025!');
   await page.getByRole('button', { name: 'Iniciar sesión' }).click();
+   // Esperar al selector y abortar si no existe
+  try {
+    await page.waitForSelector('#ddlImputaciones', { timeout: 5000 });
+  } catch (error) {
+    console.error('No se encontró el selector #ddlImputaciones - Abortando test');
+    throw new Error('Selector #ddlImputaciones no encontrado');
+  }
   await page.locator('#ddlImputaciones').selectOption('PRESENCIAL');
   await page.getByRole('link', { name: ' Entrada' }).click();
   await page.getByRole('button', { name: 'OK' }).click();

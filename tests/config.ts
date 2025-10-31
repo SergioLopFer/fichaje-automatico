@@ -2,6 +2,8 @@ import { defineConfig } from '@playwright/test';
 
 export const config = {
     baseURL: process.env.BASE_URL || 'https://www.google.com/',
+    webUser: process.env.WEB_USER || '',
+    webPassword: process.env.WEB_PASSWORD || '',
 };
 
 export default defineConfig({

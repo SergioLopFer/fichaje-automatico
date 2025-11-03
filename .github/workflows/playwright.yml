@@ -68,11 +68,9 @@ jobs:
         path: ~/.cache/ms-playwright
         key: playwright-browsers-${{ runner.os }}
 
-    - name: Install libwoff2dec
-      run: |
-        sudo apt-get update
-        sudo apt-get install -y libwoff1 libwoff2 || true
-
+    - name: Install WebKit system dependencies
+      run: sudo apt-get update && sudo apt-get install -y libwoff1 libwoff2-1 libwoff2dec0
+    
     - name: Install dependencies
       if: steps.holiday-check.outputs.is_holiday != 'true'
       run: npm ci
@@ -149,10 +147,8 @@ jobs:
         path: ~/.cache/ms-playwright
         key: playwright-browsers-${{ runner.os }}
 
-    - name: Install libwoff2dec
-      run: |
-        sudo apt-get update
-        sudo apt-get install -y libwoff1 libwoff2 || true
+    - name: Install WebKit system dependencies
+      run: sudo apt-get update && sudo apt-get install -y libwoff1 libwoff2-1 libwoff2dec0
       
     - name: Install dependencies
       if: steps.holiday-check.outputs.is_holiday != 'true'

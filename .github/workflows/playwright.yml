@@ -69,7 +69,9 @@ jobs:
         key: playwright-browsers-${{ runner.os }}
 
     - name: Install libwoff2dec
-      run: sudo apt-get update && sudo apt-get install -y libwoff2-1
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y libwoff1 libwoff2 || true
 
     - name: Install dependencies
       if: steps.holiday-check.outputs.is_holiday != 'true'
@@ -148,7 +150,9 @@ jobs:
         key: playwright-browsers-${{ runner.os }}
 
     - name: Install libwoff2dec
-      run: sudo apt-get update && sudo apt-get install -y libwoff2-1
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y libwoff1 libwoff2 || true
       
     - name: Install dependencies
       if: steps.holiday-check.outputs.is_holiday != 'true'

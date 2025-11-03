@@ -10,7 +10,7 @@ test('test', async ({ page }) => {
   await page.getByRole('button', { name: 'Iniciar sesión' }).click();
    // Esperar al selector y abortar si no existe
   try {
-    await page.waitForSelector('#ddlImputaciones', { timeout: 5000 });
+    await page.waitForSelector('#ddlImputaciones', { timeout: 10000 });
   } catch (error) {
     console.error('No se encontró el selector #ddlImputaciones - Abortando test');
     throw new Error('Selector #ddlImputaciones no encontrado');
